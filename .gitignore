@@ -1,0 +1,50 @@
+# Terraform generated files
+**/.terraform/*
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/terraform.tfvars
+**/*.auto.tfvars
+**/*.auto.tfvars.json
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Keep .terraform.lock.hcl tracked
+
+# AWS credentials
+.aws/
+credentials
+.aws-credentials
+
+# Private keys
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Generated WireGuard client configurations
+ansible/output/
+**/client*.conf
+
+# Environment files
+.env
+.env.*
+
+# Python generated files
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Logs
+*.log
+
+# IDE and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+ansible/inventory/hosts.yml
