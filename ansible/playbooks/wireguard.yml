@@ -3,5 +3,8 @@
   hosts: wireguard
   become: true
 
+  vars_files:
+    - ../output/client1.yml
+
   roles:
     - wireguard

@@ -69,6 +69,7 @@
     owner: root
     group: root
     mode: "0600"
+  notify: Restart WireGuard
 
 - name: Enable and start WireGuard
   ansible.builtin.systemd:
