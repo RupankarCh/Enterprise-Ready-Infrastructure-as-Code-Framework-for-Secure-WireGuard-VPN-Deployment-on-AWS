@@ -1,10 +1,24 @@
+# Discover available Availability Zones in the selected AWS region
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+# Use the user-selected AZ or automatically select the first available AZ
+locals {
+  selected_availability_zone = (
+    var.availability_zone != null
+    ? var.availability_zone
+    : sort(data.aws_availability_zones.available.names)[0]
+  )
+}
+
 module "vpc" {
   source = "./modules/vpc"
 
   project_name       = var.project_name
   vpc_cidr           = var.vpc_cidr
   public_subnet_cidr = var.public_subnet_cidr
-  availability_zone  = var.availability_zone
+  availability_zone  = local.selected_availability_zone
 }
 
 module "security" {

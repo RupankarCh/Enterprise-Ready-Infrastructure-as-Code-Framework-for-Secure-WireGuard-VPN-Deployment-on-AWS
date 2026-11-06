@@ -8,12 +8,6 @@ variable "aws_region" {
   default     = "ap-south-1"
 }
 
-variable "aws_profile" {
-  description = "AWS CLI Profile"
-  type        = string
-  default     = "default"
-}
-
 #########################################
 # Project Information
 #########################################
@@ -53,9 +47,10 @@ variable "public_subnet_cidr" {
 }
 
 variable "availability_zone" {
-  description = "Availability Zone"
+  description = "Availability Zone. Leave null to automatically select an available AZ."
   type        = string
-  default     = "ap-south-1a"
+  default     = null
+  nullable    = true
 }
 
 #########################################
