@@ -34,8 +34,8 @@ output "ec2_instance_id" {
 }
 
 output "vpn_public_ip" {
-  description = "VPN server public IP"
-  value       = module.ec2.public_ip
+  description = "Stable public IP address of the VPN server (Elastic IP)"
+  value       = module.ec2.vpn_elastic_ip
 }
 
 output "vpn_private_ip" {
@@ -46,4 +46,9 @@ output "vpn_private_ip" {
 output "vpn_elastic_ip" {
   description = "Elastic IP address of the VPN server"
   value       = module.ec2.vpn_elastic_ip
+}
+
+output "aws_region" {
+  description = "AWS region hosting the VPN infrastructure"
+  value       = var.aws_region
 }

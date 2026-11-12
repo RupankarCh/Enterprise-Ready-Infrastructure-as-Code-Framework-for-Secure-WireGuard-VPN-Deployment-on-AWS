@@ -1,0 +1,73 @@
+---
+- name: Validate firewall configuration
+  ansible.builtin.assert:
+    that:
+      - wireguard_firewall_vpn_interface | length > 0
+      - wireguard_firewall_external_interface | length > 0
+      - wireguard_firewall_vpn_subnet | length > 0
+      - wireguard_firewall_chain | length > 0
+      - wireguard_peer_isolation_enabled | bool
+    fail_msg: "Invalid WireGuard firewall configuration."
+
+- name: Create dedicated VPN forwarding chain
+  ansible.builtin.iptables:
+    chain: "{{ wireguard_firewall_chain }}"
+    chain_management: true
+    state: present
+
+- name: Block VPN clients from accessing VPN subnet
+  ansible.builtin.iptables:
+    chain: "{{ wireguard_firewall_chain }}"
+    in_interface: "{{ wireguard_firewall_vpn_interface }}"
+    destination: "{{ wireguard_firewall_vpn_subnet }}"
+    jump: DROP
+    state: present
+
+- name: Allow VPN clients to access internet
+  ansible.builtin.iptables:
+    chain: "{{ wireguard_firewall_chain }}"
+    in_interface: "{{ wireguard_firewall_vpn_interface }}"
+    out_interface: "{{ wireguard_firewall_external_interface }}"
+    source: "{{ wireguard_firewall_vpn_subnet }}"
+    jump: ACCEPT
+    state: present
+
+- name: Allow established internet return traffic
+  ansible.builtin.iptables:
+    chain: "{{ wireguard_firewall_chain }}"
+    in_interface: "{{ wireguard_firewall_external_interface }}"
+    out_interface: "{{ wireguard_firewall_vpn_interface }}"
+    destination: "{{ wireguard_firewall_vpn_subnet }}"
+    ctstate:
+      - RELATED
+      - ESTABLISHED
+    jump: ACCEPT
+    state: present
+
+- name: Drop other forwarded traffic originating from VPN
+  ansible.builtin.iptables:
+    chain: "{{ wireguard_firewall_chain }}"
+    in_interface: "{{ wireguard_firewall_vpn_interface }}"
+    jump: DROP
+    state: present
+
+- name: Drop unsolicited traffic forwarded towards VPN
+  ansible.builtin.iptables:
+    chain: "{{ wireguard_firewall_chain }}"
+    out_interface: "{{ wireguard_firewall_vpn_interface }}"
+    jump: DROP
+    state: present
+
+- name: Return unrelated forwarding traffic
+  ansible.builtin.iptables:
+    chain: "{{ wireguard_firewall_chain }}"
+    jump: RETURN
+    state: present
+
+- name: Attach VPN firewall chain to FORWARD
+  ansible.builtin.iptables:
+    chain: FORWARD
+    jump: "{{ wireguard_firewall_chain }}"
+    action: insert
+    rule_num: 1
+    state: present

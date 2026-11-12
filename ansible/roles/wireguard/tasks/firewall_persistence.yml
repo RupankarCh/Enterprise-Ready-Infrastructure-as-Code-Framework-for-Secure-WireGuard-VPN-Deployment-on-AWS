@@ -1,0 +1,72 @@
+---
+- name: Ensure CloudVPN libexec directory exists
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install CloudVPN firewall rule normalizer
+  ansible.builtin.copy:
+    src: cloudvpn-firewall-rule-normalize.py
+    dest: /usr/local/libexec/cloudvpn-firewall-rule-normalize.py
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install CloudVPN firewall script
+  ansible.builtin.copy:
+    src: cloudvpn-firewall.sh
+    dest: "{{ wireguard_firewall_script_path }}"
+    owner: root
+    group: root
+    mode: "0750"
+  notify: Restart CloudVPN firewall
+
+- name: Install CloudVPN firewall rollback script
+  ansible.builtin.copy:
+    src: cloudvpn-firewall-rollback.sh
+    dest: /usr/local/sbin/cloudvpn-firewall-rollback.sh
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Ensure WireGuard systemd drop-in directory exists
+  ansible.builtin.file:
+    path: "/etc/systemd/system/wg-quick@{{ wireguard_interface }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install CloudVPN WireGuard firewall dependency
+  ansible.builtin.template:
+    src: wg-quick-cloudvpn-firewall.conf.j2
+    dest: "/etc/systemd/system/wg-quick@{{ wireguard_interface }}.service.d/cloudvpn-firewall.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  register: cloudvpn_wireguard_dependency_file
+
+- name: Install CloudVPN firewall systemd service
+  ansible.builtin.template:
+    src: cloudvpn-firewall.service.j2
+    dest: "/etc/systemd/system/{{ wireguard_firewall_service_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: cloudvpn_firewall_service_file
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: >-
+    cloudvpn_firewall_service_file.changed or
+    cloudvpn_wireguard_dependency_file.changed
+
+- name: Enable and start CloudVPN firewall service
+  ansible.builtin.systemd:
+    name: "{{ wireguard_firewall_service_name }}"
+    enabled: true
+    state: started

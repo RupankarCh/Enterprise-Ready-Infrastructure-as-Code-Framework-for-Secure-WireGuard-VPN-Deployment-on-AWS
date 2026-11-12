@@ -1,3 +1,6 @@
+# Local WireGuard client configuration
+ansible/vars/client1.yml
+
 # Terraform generated files
 **/.terraform/*
 **/*.tfstate
@@ -48,3 +51,22 @@ venv/
 .DS_Store
 Thumbs.db
 ansible/inventory/hosts.yml
+
+# Local development backups
+*.backup
+*.bak
+
+# Local firewall script backups
+ansible/roles/wireguard/files/*.pre-*
+
+# Development and pre-change backups
+*.pre-*
+
+# Local deployment configuration
+config/deployment.json
+
+# Generated Terraform configuration
+terraform/terraform.auto.tfvars.json
+
+# Generated Ansible deployment variables
+ansible/vars/deployment.yml

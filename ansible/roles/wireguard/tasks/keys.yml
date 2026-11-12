@@ -1,0 +1,66 @@
+---
+- name: Check whether WireGuard server private key exists
+  ansible.builtin.stat:
+    path: /etc/wireguard/server_private.key
+  register: wireguard_server_private_key
+
+- name: Validate server identity provisioning policy
+  ansible.builtin.assert:
+    that:
+      - >-
+        wireguard_server_private_key.stat.exists or
+        (wireguard_server_key_generation_enabled | bool)
+    fail_msg: >-
+      Existing server private key was not found.
+      Automatic key generation is disabled.
+      Enable wireguard_server_key_generation_enabled only
+      when intentionally provisioning a new VPN server.
+
+- name: Generate server private key when explicitly authorized
+  ansible.builtin.shell:
+    cmd: umask 077 && wg genkey > /etc/wireguard/server_private.key
+    creates: /etc/wireguard/server_private.key
+  when:
+    - not wireguard_server_private_key.stat.exists
+    - wireguard_server_key_generation_enabled | bool
+  no_log: true
+
+- name: Set server private key permissions
+  ansible.builtin.file:
+    path: /etc/wireguard/server_private.key
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Read existing server private key securely
+  ansible.builtin.slurp:
+    src: /etc/wireguard/server_private.key
+  register: wireguard_server_private_key_content
+  no_log: true
+
+- name: Derive expected server public key
+  ansible.builtin.shell:
+    cmd: wg pubkey < /etc/wireguard/server_private.key
+  register: wireguard_derived_public_key
+  changed_when: false
+  no_log: true
+
+- name: Read existing server public key
+  ansible.builtin.slurp:
+    src: /etc/wireguard/server_public.key
+  register: wireguard_existing_public_key
+  failed_when: false
+  no_log: true
+
+- name: Write correct server public key
+  ansible.builtin.copy:
+    content: "{{ wireguard_derived_public_key.stdout }}\n"
+    dest: /etc/wireguard/server_public.key
+    owner: root
+    group: root
+    mode: "0644"
+  when: >-
+    wireguard_existing_public_key.content is not defined or
+    (wireguard_existing_public_key.content | b64decode | trim)
+    != wireguard_derived_public_key.stdout
+  no_log: true

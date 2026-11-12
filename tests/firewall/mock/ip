@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+if [[ "$#" -eq 3 && "$1" == "link" && "$2" == "show" ]]; then
+    case "$3" in
+        wg0)
+            if [[ "${MOCK_IP_MISSING_WG0:-false}" == "true" ]]; then
+                echo "Mock interface unavailable: wg0" >&2
+                exit 1
+            fi
+            exit 0
+            ;;
+        ens5)
+            exit 0
+            ;;
+        *)
+            echo "Mock interface unavailable: $3" >&2
+            exit 1
+            ;;
+    esac
+fi
+
+echo "Unsupported mock ip command: $*" >&2
+exit 1

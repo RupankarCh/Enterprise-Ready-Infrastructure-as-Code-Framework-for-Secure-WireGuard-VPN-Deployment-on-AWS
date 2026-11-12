@@ -1,0 +1,23 @@
+[Unit]
+Description=CloudVPN WireGuard Peer Isolation Firewall
+Documentation=https://www.wireguard.com/
+
+Before=wg-quick@{{ wireguard_interface }}.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+Environment="VPN_INTERFACE={{ wireguard_firewall_vpn_interface }}"
+Environment="EXTERNAL_INTERFACE={{ wireguard_firewall_external_interface }}"
+Environment="VPN_SUBNET={{ wireguard_firewall_vpn_subnet }}"
+Environment="FIREWALL_CHAIN={{ wireguard_firewall_chain }}"
+
+Environment="INPUT_FIREWALL_ENABLED={{ wireguard_firewall_input_enabled | ternary('true', 'false') }}"
+Environment="INPUT_FIREWALL_CHAIN={{ wireguard_firewall_input_chain }}"
+Environment="INPUT_FIREWALL_STAGING_CHAIN={{ wireguard_firewall_input_staging_chain }}"
+
+ExecStart={{ wireguard_firewall_script_path }}
+
+[Install]
+WantedBy=multi-user.target

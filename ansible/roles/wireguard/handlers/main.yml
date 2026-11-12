@@ -1,4 +1,9 @@
 ---
+- name: Restart CloudVPN firewall
+  ansible.builtin.systemd:
+    name: "{{ wireguard_firewall_service_name }}"
+    state: restarted
+
 - name: Restart WireGuard
   ansible.builtin.systemd:
     name: "wg-quick@{{ wireguard_interface }}"

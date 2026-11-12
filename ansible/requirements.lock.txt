@@ -1,0 +1,16 @@
+ansible-core==2.21.3
+boto3==1.43.83
+botocore==1.43.83
+cffi==2.1.1
+cryptography==50.0.2
+Jinja2==3.1.6
+jmespath==1.1.0
+MarkupSafe==3.0.4
+packaging==26.3
+pycparser==3.12
+python-dateutil==2.9.0.post0
+PyYAML==6.0.3
+resolvelib==1.2.1
+s3transfer==0.19.3
+six==1.17.0
+urllib3==2.8.0

@@ -2,9 +2,11 @@
 - name: Configure WireGuard VPN server
   hosts: wireguard
   become: true
+  gather_facts: true
 
   vars_files:
-    - ../output/client1.yml
+    - "{{ playbook_dir }}/../vars/deployment.yml"
+    - "{{ wireguard_client_vars_file | default(playbook_dir ~ '/../vars/client1.yml') }}"
 
   roles:
     - wireguard

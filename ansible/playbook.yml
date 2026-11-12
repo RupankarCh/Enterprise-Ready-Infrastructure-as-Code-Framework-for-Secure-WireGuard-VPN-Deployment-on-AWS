@@ -1,0 +1,3 @@
+---
+- name: Import canonical WireGuard deployment playbook
+  ansible.builtin.import_playbook: playbooks/wireguard.yml

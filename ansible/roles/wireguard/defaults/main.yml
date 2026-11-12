@@ -15,8 +15,49 @@ wireguard_dns: "1.1.1.1"
 
 wireguard_client_dns: "1.1.1.1"
 
-wireguard_external_interface: "ens5"
+wireguard_external_interface: "{{ ansible_default_ipv4.interface }}"
 
 wireguard_package:
   - wireguard
   - wireguard-tools
+  - iptables
+  - iproute2
+  - python3
+  - util-linux
+  - procps
+
+# Firewall security configuration
+wireguard_firewall_enabled: true
+
+# Explicit opt-in required before running WireGuard without CloudVPN firewall.
+wireguard_allow_unprotected_wireguard: false
+
+wireguard_firewall_backend: iptables
+
+wireguard_firewall_vpn_interface: "{{ wireguard_interface }}"
+
+wireguard_firewall_external_interface: "{{ wireguard_external_interface }}"
+
+wireguard_firewall_vpn_subnet: "{{ wireguard_network }}"
+
+
+wireguard_firewall_chain: CLOUDVPN_FORWARD
+
+# Firewall persistence configuration
+wireguard_firewall_persist: true
+
+wireguard_firewall_script_path: /usr/local/sbin/cloudvpn-firewall.sh
+
+wireguard_firewall_service_name: cloudvpn-firewall.service
+
+# VPN client-to-host INPUT firewall protection
+wireguard_firewall_input_enabled: true
+
+wireguard_firewall_input_chain: CLOUDVPN_INPUT
+
+wireguard_firewall_input_staging_chain: CLOUDVPN_INPUT_STAGE
+
+# Server identity protection
+# Keep false when migrating an existing VPN.
+# Set true only when intentionally provisioning a new server.
+wireguard_server_key_generation_enabled: false

@@ -1,0 +1,31 @@
+---
+- name: Inspect managed CloudVPN firewall systemd unit
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ wireguard_firewall_service_name }}"
+  register: cloudvpn_firewall_unit_stat
+
+- name: Stop and disable managed CloudVPN firewall service
+  ansible.builtin.systemd:
+    name: "{{ wireguard_firewall_service_name }}"
+    enabled: false
+    state: stopped
+  when: cloudvpn_firewall_unit_stat.stat.exists
+
+- name: Remove managed WireGuard firewall dependency
+  ansible.builtin.file:
+    path: "/etc/systemd/system/wg-quick@{{ wireguard_interface }}.service.d/cloudvpn-firewall.conf"
+    state: absent
+  register: cloudvpn_wireguard_dependency_removed
+
+- name: Remove managed CloudVPN firewall systemd unit
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ wireguard_firewall_service_name }}"
+    state: absent
+  register: cloudvpn_firewall_unit_removed
+
+- name: Reload systemd after removing managed firewall integration
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: >-
+    cloudvpn_wireguard_dependency_removed.changed or
+    cloudvpn_firewall_unit_removed.changed

@@ -1,4 +1,30 @@
 ---
+- name: Validate discovered external network interface
+  ansible.builtin.assert:
+    that:
+      - ansible_default_ipv4 is defined
+      - ansible_default_ipv4.interface is defined
+      - ansible_default_ipv4.interface | length > 0
+    fail_msg: >-
+      Could not discover the server's default IPv4 network interface.
+      Check network connectivity and Ansible fact gathering.
+    quiet: true
+
+- name: Validate CloudVPN firewall lifecycle configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (wireguard_firewall_enabled | bool) or
+        (wireguard_firewall_persist | bool)
+      - >-
+        (wireguard_firewall_enabled | bool) or
+        (wireguard_allow_unprotected_wireguard | bool)
+    fail_msg: >-
+      Unsafe firewall configuration. An enabled firewall must be persistent.
+      Disabling the firewall requires explicit opt-in with
+      wireguard_allow_unprotected_wireguard=true.
+    quiet: true
+
 - name: Update apt package cache
   ansible.builtin.apt:
     update_cache: true
@@ -8,6 +34,16 @@
   ansible.builtin.apt:
     name: "{{ wireguard_package }}"
     state: present
+
+- name: Validate external network interface exists
+  ansible.builtin.command:
+    argv:
+      - ip
+      - link
+      - show
+      - dev
+      - "{{ wireguard_external_interface }}"
+  changed_when: false
 
 - name: Enable IPv4 forwarding
   ansible.posix.sysctl:
@@ -24,43 +60,8 @@
     group: root
     mode: "0700"
 
-- name: Check whether server private key exists
-  ansible.builtin.stat:
-    path: /etc/wireguard/server_private.key
-  register: wireguard_server_private_key
-
-- name: Generate server private key
-  ansible.builtin.shell:
-    cmd: wg genkey > /etc/wireguard/server_private.key
-    creates: /etc/wireguard/server_private.key
-  when: not wireguard_server_private_key.stat.exists
-  no_log: true
-
-- name: Set server private key permissions
-  ansible.builtin.file:
-    path: /etc/wireguard/server_private.key
-    owner: root
-    group: root
-    mode: "0600"
-
-- name: Read server private key
-  ansible.builtin.slurp:
-    src: /etc/wireguard/server_private.key
-  register: wireguard_server_private_key_content
-  no_log: true
-
-- name: Generate server public key
-  ansible.builtin.shell:
-    cmd: "wg pubkey < /etc/wireguard/server_private.key > /etc/wireguard/server_public.key"
-    creates: /etc/wireguard/server_public.key
-  no_log: true
-
-- name: Set server public key permissions
-  ansible.builtin.file:
-    path: /etc/wireguard/server_public.key
-    owner: root
-    group: root
-    mode: "0644"
+- name: Manage WireGuard server keys
+  ansible.builtin.import_tasks: keys.yml
 
 - name: Deploy WireGuard server configuration
   ansible.builtin.template:
@@ -70,6 +71,19 @@
     group: root
     mode: "0600"
   notify: Restart WireGuard
+
+- name: Configure firewall persistence
+  ansible.builtin.import_tasks: firewall_persistence.yml
+  when:
+    - wireguard_firewall_enabled | bool
+    - wireguard_firewall_persist | bool
+
+- name: Remove managed firewall integration when explicitly disabled
+  ansible.builtin.import_tasks: firewall_disabled.yml
+  when: not (wireguard_firewall_enabled | bool)
+
+- name: Apply pending WireGuard and firewall restarts
+  ansible.builtin.meta: flush_handlers
 
 - name: Enable and start WireGuard
   ansible.builtin.systemd:

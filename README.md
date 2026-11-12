@@ -1,98 +1,115 @@
 # CloudVPN-IaC
 
-### Infrastructure as Code for a Personal Cloud VPN on AWS
+An Infrastructure-as-Code project for deploying a personal WireGuard VPN server on AWS using Terraform and Ansible.
 
-CloudVPN-IaC is an Infrastructure-as-Code project that automates the deployment and configuration of a self-managed WireGuard VPN server on Amazon Web Services (AWS).
+The project focuses on reproducible infrastructure, secure remote administration, automated configuration, and controlled deployment through AWS Systems Manager (SSM).
 
-The project combines Terraform, Ansible, AWS Systems Manager (SSM), IAM, and WireGuard to provide a secure, reproducible, and cost-conscious VPN infrastructure.
+## Table of Contents
 
-The primary objectives are:
-
-* Deploy VPN infrastructure using Terraform.
-* Configure the VPN server using Ansible.
-* Manage EC2 instances through AWS Systems Manager without exposing SSH.
-* Use IAM instance roles instead of storing long-lived AWS credentials.
-* Provide encrypted internet connectivity through WireGuard.
-* Maintain a modular and extensible architecture for future security integrations.
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Repository Structure](#repository-structure)
+- [Security Architecture](#security-architecture)
+- [Prerequisites](#prerequisites)
+- [Configuration](#configuration)
+- [Deployment Workflow](#deployment-workflow)
+- [WireGuard Client Configuration](#wireguard-client-configuration)
+- [Validation and Testing](#validation-and-testing)
+- [Continuous Integration](#continuous-integration)
+- [Security Exceptions](#security-exceptions)
+- [Sensitive Files and Git Security](#sensitive-files-and-git-security)
+- [Cost Considerations](#cost-considerations)
+- [Future Security Integration](#future-security-integration)
+- [Disclaimer](#disclaimer)
+- [License](#license)
 
 ---
 
+## Project Overview
+
+CloudVPN-IaC automates the deployment and configuration of a WireGuard VPN server on Amazon Web Services.
+
+The infrastructure is managed using Terraform, while Ansible configures the VPN server.
+
+The project uses AWS Systems Manager Session Manager for remote server administration instead of exposing SSH access to the internet.
+
+The main objectives are:
+
+- Reproducible AWS infrastructure deployment.
+- Automated WireGuard installation and configuration.
+- Secure remote administration through AWS SSM.
+- IAM-based authentication instead of storing AWS credentials on the EC2 server.
+- Automated configuration generation from a single JSON configuration file.
+- Controlled firewall installation and lifecycle management.
+- GitHub Actions-based infrastructure and security validation.
+
 ## Architecture
 
-The infrastructure consists of:
+### Infrastructure Overview
 
-| Component           | Purpose                                      |
-| ------------------- | -------------------------------------------- |
-| Amazon VPC          | Provides an isolated networking environment. |
-| Public Subnet       | Hosts the VPN server.                        |
-| Internet Gateway    | Provides internet connectivity.              |
-| Route Table         | Controls network traffic routing.            |
-| Amazon EC2          | Hosts the WireGuard VPN server.              |
-| Elastic IP          | Provides a persistent public endpoint.       |
-| Security Groups     | Controls inbound and outbound traffic.       |
-| AWS IAM Role        | Provides permissions to the EC2 instance.    |
-| AWS Systems Manager | Enables remote administration without SSH.   |
-| Terraform           | Provisions AWS infrastructure.               |
-| Ansible             | Automates server configuration.              |
-| WireGuard           | Provides encrypted VPN connectivity.         |
+| Component | Configuration |
+|---|---|
+| Cloud Provider | Amazon Web Services |
+| Region | ap-south-1 (configurable) |
+| Infrastructure as Code | Terraform |
+| Configuration Management | Ansible |
+| VPN Technology | WireGuard |
+| Operating System | Ubuntu 24.04 |
+| EC2 Instance | t3.micro (configurable) |
+| VPN Protocol | UDP |
+| WireGuard Port | 51820 (configurable) |
+| VPN Network | 10.8.0.0/24 |
+| Remote Administration | AWS Systems Manager |
+| Authentication | IAM Instance Role |
+| Network | Custom VPC and public subnet |
 
-### Network Configuration
+### Architecture Flow
 
-| Parameter                  | Configuration    |
-| -------------------------- | ---------------- |
-| AWS Region                 | ap-south-1       |
-| Operating System           | Ubuntu 24.04 LTS |
-| EC2 Instance Type          | t3.micro         |
-| VPN Protocol               | WireGuard        |
-| VPN Interface              | wg0              |
-| VPN Network                | 10.8.0.0/24      |
-| VPN Server Address         | 10.8.0.1         |
-| VPN Client Address         | 10.8.0.2         |
-| WireGuard Port             | UDP 51820        |
-| DNS                        | 1.1.1.1          |
-| External Network Interface | ens5             |
+1. Terraform provisions the AWS infrastructure.
+2. An EC2 instance is launched in the public subnet.
+3. An IAM instance role provides the permissions required for Systems Manager.
+4. AWS Systems Manager provides remote administration without public SSH access.
+5. Ansible connects through the SSM connection plugin.
+6. Ansible installs and configures WireGuard.
+7. Firewall rules permit VPN traffic and the required forwarding behaviour.
+8. VPN clients connect to the WireGuard server.
+
+### Network Design
+
+The architecture uses:
+
+- A custom VPC.
+- A public subnet.
+- An Internet Gateway.
+- A route table for internet connectivity.
+- An EC2-based WireGuard server.
+- Security groups and network ACLs.
+- IPv4 forwarding for VPN traffic.
+
+The VPN client network is separate from the AWS VPC network.
 
 ---
 
 ## Technology Stack
 
-| Technology          | Purpose                        |
-| ------------------- | ------------------------------ |
-| Terraform           | Infrastructure provisioning    |
-| AWS EC2             | VPN server hosting             |
-| AWS VPC             | Network isolation              |
-| AWS IAM             | Identity and access management |
-| AWS Systems Manager | Secure instance management     |
-| Ansible             | Configuration automation       |
-| WireGuard           | VPN protocol                   |
-| Ubuntu              | Server operating system        |
-| iptables            | Network forwarding and NAT     |
-| Git / GitHub        | Version control                |
-
----
-
-## Security Design
-
-The project follows several security principles:
-
-* No inbound SSH access is required for instance administration.
-* IAM instance roles are used instead of storing AWS credentials on EC2.
-* AWS Systems Manager provides remote instance management.
-* IMDSv2 is required for instance metadata access.
-* EC2 source/destination checking is disabled to support VPN routing.
-* WireGuard provides encrypted VPN communication.
-* Server private keys are stored on the server with restricted permissions.
-* Terraform state files and sensitive local configuration files are excluded from Git.
-* Client configuration files and private keys are excluded from version control.
-
-### Network Security
-
-The WireGuard server uses:
-
-* UDP port 51820 for VPN connections.
-* IPv4 forwarding to route client traffic.
-* iptables FORWARD rules to permit VPN traffic.
-* NAT masquerading to allow VPN clients to access the internet through EC2.
+| Technology | Purpose |
+|---|---|
+| AWS EC2 | Hosts the WireGuard VPN server |
+| AWS VPC | Provides network isolation |
+| AWS Security Groups | Controls instance-level network access |
+| AWS Network ACLs | Provides subnet-level network filtering |
+| AWS IAM | Manages permissions and instance identity |
+| AWS Systems Manager | Enables remote server administration |
+| Amazon S3 | Provides the SSM transfer bucket used by the Ansible connection plugin |
+| Terraform | Provisions AWS infrastructure |
+| Ansible | Configures the VPN server |
+| WireGuard | Provides encrypted VPN connectivity |
+| Python | Validates deployment configuration and runs tests |
+| Bash | Automates configuration and inventory generation |
+| GitHub Actions | Performs automated repository validation |
+| Gitleaks | Scans repository content for exposed secrets |
+| Trivy | Scans infrastructure configuration for security issues |
 
 ---
 
@@ -100,159 +117,324 @@ The WireGuard server uses:
 
 ```text
 CloudVPN-IaC/
+│
 ├── .github/
 │   └── workflows/
-├── .gitattributes
-├── .gitignore
+│       └── ci.yml
+│
 ├── ansible/
+│   ├── ansible.cfg
+│   ├── playbook.yml
+│   ├── requirements.txt
+│   ├── requirements.yml
+│   │
 │   ├── inventory/
 │   │   └── hosts.example.yml
-│   ├── output/                  # Local sensitive files; ignored by Git
+│   │
 │   ├── playbooks/
 │   │   └── wireguard.yml
+│   │
 │   ├── roles/
 │   │   └── wireguard/
 │   │       ├── defaults/
-│   │       │   └── main.yml
-│   │       ├── handlers/
-│   │       │   └── main.yml
+│   │       ├── files/
 │   │       ├── tasks/
-│   │       │   └── main.yml
 │   │       └── templates/
-│   │           └── wg0.conf.j2
-│   ├── vars/
-│   │   └── client1.example.yml
-│   ├── ansible.cfg
-│   └── requirements.yml
-├── cloud-init/
-├── diagrams/
+│   │
+│   └── vars/
+│       └── client1.example.yml
+│
+├── config/
+│   └── deployment.example.json
+│
 ├── docs/
-├── monitoring/
+│   └── security-exceptions.md
+│
 ├── scripts/
-├── security/
-└── terraform/
-    └── modules/
-        ├── ec2/
-        ├── security/
-        └── vpc/
+│   ├── configure.sh
+│   └── generate-inventory.sh
+│
+├── terraform/
+│   ├── modules/
+│   ├── main.tf
+│   ├── outputs.tf
+│   ├── variables.tf
+│   ├── versions.tf
+│   └── .terraform.lock.hcl
+│
+├── tests/
+│   └── firewall/
+│
+├── .gitignore
+├── .gitattributes
+└── README.md
 ```
+
+The repository also contains local configuration and generated files that are intentionally excluded from Git.
 
 ---
 
-## Implementation Status
+## Security Architecture
 
-### Implemented
+Security is incorporated into the infrastructure and configuration-management design.
 
-* AWS infrastructure provisioned using Terraform.
-* EC2 VPN server deployed.
-* VPC and networking resources configured.
-* Elastic IP associated with the VPN server.
-* IAM instance role configured.
-* AWS Systems Manager connectivity verified.
-* Ansible connectivity through SSM verified.
-* EC2 source/destination check disabled.
-* WireGuard installed and configured.
-* WireGuard server interface configured.
-* IPv4 forwarding enabled.
-* iptables forwarding and NAT rules implemented.
-* WireGuard client peer configuration implemented.
-* Windows WireGuard client configuration generated.
-* Ansible handlers implemented for WireGuard configuration changes.
-* Sensitive local files excluded from Git.
+### 1. IAM Instance Role
 
-### Next Development Goals
+The EC2 instance uses an IAM instance role to obtain AWS permissions.
 
-* Improve client provisioning and revocation automation.
-* Implement automated client key rotation.
-* Integrate AWS CloudWatch monitoring and alerting.
-* Integrate Amazon GuardDuty and Security Hub.
-* Implement security auditing and operational logging.
-* Improve firewall hardening.
-* Develop a web-based VPN management interface.
-* Explore browser extension and application integration.
+This avoids storing long-lived AWS access keys on the VPN server.
 
-**Development note:** The current implementation provides a functional single-server WireGuard VPN architecture. Further production hardening, automated security monitoring, and operational validation are planned.
+The instance role provides the permissions required for Systems Manager functionality.
+
+### 2. AWS Systems Manager
+
+Systems Manager provides remote administration.
+
+The architecture avoids exposing SSH port 22 to the internet.
+
+The Ansible SSM connection plugin uses the EC2 instance ID, AWS region, and an S3 transfer bucket.
+
+### 3. IMDSv2
+
+The EC2 instance metadata configuration uses IMDSv2 to strengthen access to instance metadata.
+
+### 4. WireGuard Key Protection
+
+WireGuard private keys require restricted filesystem permissions.
+
+The Ansible configuration:
+
+- Preserves existing server keys by default.
+- Does not automatically regenerate existing server keys.
+- Requires explicit opt-in for server key generation.
+- Restricts private-key file permissions.
+- Uses protected handling for sensitive key material.
+
+The default configuration sets:
+
+```yaml
+wireguard_server_key_generation_enabled: false
+```
+
+### 5. Firewall Management
+
+The Ansible role manages firewall configuration and lifecycle operations.
+
+The implementation includes:
+
+- Firewall rule installation.
+- Rule normalization.
+- Rollback handling.
+- Persistence support.
+- Systemd startup ordering.
+- Firewall disable handling.
+
+Firewall changes should be validated carefully before deployment because incorrect rules can interrupt VPN connectivity.
+
+### 6. Network Security
+
+The infrastructure uses security groups and network ACLs to control network access.
+
+Some outbound permissions are required for full-tunnel VPN functionality. These are documented separately under [Security Exceptions](#security-exceptions).
 
 ---
 
 ## Prerequisites
 
-Before deployment, install:
+Install the following tools on the deployment workstation:
 
-* AWS account.
-* AWS CLI.
-* Terraform.
-* Ansible.
-* AWS Session Manager plugin.
-* Python.
-* Required Ansible collections.
-* Git.
+- Terraform.
+- Python 3.
+- Ansible.
+- AWS CLI.
+- Git.
+- WireGuard client application.
+
+Ansible dependencies are defined in:
+
+```text
+ansible/requirements.txt
+ansible/requirements.yml
+```
+
+Install the Python requirements:
+
+```bash
+pip install -r ansible/requirements.txt
+```
+
+Install the Ansible collections:
+
+```bash
+ansible-galaxy collection install -r ansible/requirements.yml
+```
+
+Configure AWS CLI credentials on the deployment workstation with permissions appropriate for Terraform provisioning and SSM inventory generation.
+
+The EC2 instance uses its IAM role for AWS access; long-lived AWS credentials should not be copied onto the VPN server.
 
 ---
 
-## Deployment Overview
+## Configuration
 
-### 1. Configure AWS credentials
+The project uses a central JSON configuration file.
 
-Configure AWS CLI credentials on your local administration machine.
-
-Do not store AWS access keys in the EC2 instance or commit them to Git.
-
-### 2. Provision AWS infrastructure
-
-Use Terraform to initialize, validate, review, and deploy the infrastructure.
-
-Review the Terraform plan before applying changes.
-
-### 3. Configure Ansible
-
-Configure the SSM inventory using the provided example inventory file.
-
-Verify connectivity:
+First, create the local configuration:
 
 ```bash
-cd ansible
-
-ansible wireguard -m ansible.builtin.ping
+cp config/deployment.example.json config/deployment.json
 ```
 
-### 4. Configure the WireGuard client public key
+Edit:
 
-Create the local output directory:
-
-```bash
-mkdir -p output
+```text
+config/deployment.json
 ```
 
-Copy the example variables file:
+The example configuration contains these sections:
 
-```bash
-cp vars/client1.example.yml output/client1.yml
-```
+| Section | Purpose |
+|---|---|
+| schema_version | Configuration schema version |
+| aws | AWS region |
+| project | Project and deployment identification |
+| network | VPC and subnet configuration |
+| ec2 | Instance type and root volume size |
+| wireguard | VPN server settings |
+| client | VPN client settings |
+| ssm | SSM transfer bucket configuration |
 
-Edit `output/client1.yml` and replace the placeholder with the actual WireGuard client public key.
+The SSM bucket name must be replaced with a valid bucket name.
 
-Never put the client private key in this file.
-
-### 5. Deploy WireGuard
+### Configuration Generator
 
 Run:
 
 ```bash
-ansible-playbook playbooks/wireguard.yml
+./scripts/configure.sh
 ```
 
-The playbook installs WireGuard, enables IPv4 forwarding, generates server keys when needed, and deploys the WireGuard configuration.
+The script:
 
-### 6. Configure the VPN client
+1. Reads the local JSON configuration.
+2. Validates required configuration sections.
+3. Validates network CIDRs and IP addresses.
+4. Validates AWS region, instance settings, and WireGuard parameters.
+5. Generates Terraform variables.
+6. Generates Ansible variables.
+7. Writes generated files atomically.
+8. Sets generated file permissions to `600`.
 
-Import the generated client configuration into the WireGuard application on Windows or another supported operating system.
+Generated files:
 
-Activate the VPN connection.
+```text
+terraform/terraform.auto.tfvars.json
+ansible/vars/deployment.yml
+```
 
-### 7. Verify VPN connectivity
+The configuration generator does not make AWS API calls.
 
-On the server, inspect the WireGuard interface:
+The generated Terraform and Ansible files are local deployment artifacts and must not be committed.
+
+---
+
+## Deployment Workflow
+
+The deployment process is divided into infrastructure provisioning and server configuration.
+
+### Step 1: Generate Configuration
+
+From the repository root:
+
+```bash
+./scripts/configure.sh
+```
+
+Review the configuration before continuing.
+
+### Step 2: Initialize Terraform
+
+```bash
+terraform -chdir=terraform init
+```
+
+### Step 3: Validate Terraform
+
+```bash
+terraform -chdir=terraform validate
+```
+
+### Step 4: Review the Deployment Plan
+
+```bash
+terraform -chdir=terraform plan
+```
+
+Review the proposed changes carefully.
+
+### Step 5: Provision AWS Infrastructure
+
+Only after reviewing and approving the plan:
+
+```bash
+terraform -chdir=terraform apply
+```
+
+Terraform provisions the AWS infrastructure defined by the project.
+
+### Step 6: Generate the Ansible Inventory
+
+After successful infrastructure provisioning, generate the inventory:
+
+```bash
+./scripts/generate-inventory.sh YOUR_SSM_BUCKET_NAME
+```
+
+Alternatively, provide the bucket name through the environment:
+
+```bash
+export SSM_BUCKET_NAME="YOUR_SSM_BUCKET_NAME"
+
+./scripts/generate-inventory.sh
+```
+
+The inventory generator:
+
+- Reads the EC2 instance ID from Terraform outputs.
+- Reads the AWS region from Terraform outputs.
+- Verifies access to the S3 transfer bucket.
+- Generates an inventory using `amazon.aws.aws_ssm`.
+- Writes the inventory atomically.
+- Restricts inventory permissions to `600`.
+
+This script makes AWS API calls. It is not part of local-only configuration validation.
+
+The generated inventory is:
+
+```text
+ansible/inventory/hosts.yml
+```
+
+### Step 7: Configure the VPN Server
+
+Run the Ansible playbook from the Ansible directory:
+
+```bash
+cd ansible
+
+ANSIBLE_CONFIG="$PWD/ansible.cfg" \
+ansible-playbook \
+  -i inventory/hosts.yml \
+  playbooks/wireguard.yml
+```
+
+Ansible connects through AWS Systems Manager and configures the VPN server.
+
+The playbook manages WireGuard installation, IPv4 forwarding, key handling, WireGuard configuration, and firewall operations.
+
+### Step 8: Verify the VPN Server
+
+On the VPN server, inspect the WireGuard interface:
 
 ```bash
 sudo wg show
@@ -270,7 +452,121 @@ Expected output:
 net.ipv4.ip_forward = 1
 ```
 
-Verify the VPN connection from the client by checking the public IP address. When full-tunnel routing is working, internet traffic should exit through the AWS VPN server.
+Verify the firewall configuration and confirm that the VPN interface is operational.
+
+### Step 9: Connect the VPN Client
+
+Import the generated client configuration into the WireGuard application.
+
+Activate the VPN connection and verify that internet traffic exits through the AWS VPN server when full-tunnel routing is configured.
+
+---
+
+## WireGuard Client Configuration
+
+The example deployment configuration defines:
+
+| Parameter | Example |
+|---|---|
+| Client name | client1 |
+| Client address | 10.8.0.2/32 |
+| DNS | 1.1.1.1 |
+| Allowed IPs | 0.0.0.0/0, ::/0 |
+| Persistent Keepalive | 25 seconds |
+
+The client configuration should contain the appropriate private key and server public key.
+
+Never commit generated client configuration files or client private keys.
+
+---
+
+## Validation and Testing
+
+The project includes local validation and automated tests.
+
+### Terraform Validation
+
+```bash
+terraform -chdir=terraform fmt -check -recursive
+
+terraform -chdir=terraform validate
+```
+
+### Ansible Syntax Validation
+
+```bash
+cd /home/rupankar/projects/CloudVPN-IaC
+
+ANSIBLE_CONFIG="$PWD/ansible/ansible.cfg" \
+ansible-playbook \
+  -i ansible/inventory/hosts.example.yml \
+  ansible/playbooks/wireguard.yml \
+  --syntax-check \
+  -e wireguard_client_vars_file=ansible/vars/client1.example.yml
+```
+
+### Firewall Tests
+
+```bash
+python3 -m unittest discover \
+  -s tests/firewall \
+  -p 'test_*.py' \
+  -v
+```
+
+### Secret Scanning
+
+Gitleaks is used to scan repository content for potentially exposed secrets.
+
+### Infrastructure Security Scanning
+
+Trivy is used to scan Terraform infrastructure configuration for security issues.
+
+The CI security scan is currently report-only for Trivy findings. A successful CI run should not be interpreted as proof that the infrastructure is completely secure.
+
+---
+
+## Continuous Integration
+
+GitHub Actions is configured through:
+
+```text
+.github/workflows/ci.yml
+```
+
+The workflow contains five jobs:
+
+| Job | Purpose |
+|---|---|
+| terraform | Terraform formatting and validation |
+| ansible | Ansible dependency installation and syntax validation |
+| firewall-tests | Firewall shell and Python unit tests |
+| gitleaks | Secret scanning |
+| trivy | Terraform security scanning |
+
+The workflow is intended to validate repository changes without provisioning AWS infrastructure.
+
+The CI configuration uses example deployment settings and placeholder values for validation.
+
+Actual GitHub Actions execution must be verified after the workflow is pushed to GitHub.
+
+---
+
+## Security Exceptions
+
+The project documents security exceptions in:
+
+```text
+docs/security-exceptions.md
+```
+
+The documented exceptions relate to network egress requirements for full-tunnel VPN operation.
+
+These exceptions should be reviewed before production use.
+
+A security scan may identify broad egress rules even when they are intentional for the current VPN architecture.
+
+The exceptions are documented rather than treated as automatically approved security controls.
 
 ---
 
@@ -278,17 +574,23 @@ Verify the VPN connection from the client by checking the public IP address. Whe
 
 The following files must never be committed:
 
-* Terraform state files.
-* Terraform variable files containing secrets.
-* AWS credentials.
-* WireGuard server private keys.
-* WireGuard client private keys.
-* Generated client configuration files.
-* Actual local inventory files containing environment-specific details.
+- Terraform state files.
+- Terraform variable files containing sensitive information.
+- AWS credentials.
+- WireGuard server private keys.
+- WireGuard client private keys.
+- Generated client configurations.
+- Actual local Ansible inventory files.
+- Generated deployment variables.
+- Local environment files.
 
 Example files containing placeholders may be committed.
 
-The repository uses `.gitignore` and `.gitattributes` to help protect sensitive files and maintain consistent LF line endings.
+The repository uses `.gitignore` to exclude local and generated artifacts and `.gitattributes` to help maintain consistent line endings.
+
+Before publishing the repository, inspect the Git tracking status and run secret scanning.
+
+Do not publish Terraform state or generated credentials, even if they appear to contain no obvious secrets.
 
 ---
 
@@ -296,30 +598,31 @@ The repository uses `.gitignore` and `.gitattributes` to help protect sensitive 
 
 AWS resources may incur charges, including:
 
-* EC2 compute.
-* Elastic IP addresses.
-* EBS storage.
-* Data transfer.
-* Monitoring services.
+- EC2 compute.
+- Elastic IP addresses.
+- EBS storage.
+- Network data transfer.
+- S3 storage and requests.
+- Other supporting AWS services.
 
-Actual costs depend on the AWS region, instance type, usage duration, and applicable AWS pricing.
+Actual costs depend on the AWS region, instance type, usage duration, data-transfer volume, and applicable AWS pricing.
 
-Always monitor AWS billing and remove resources that are no longer required.
+Review AWS billing and cost estimates before deployment.
 
 ---
 
 ## Future Security Integration
 
-The architecture is designed to support additional security capabilities:
+The architecture is designed to support additional security capabilities.
 
-| Service                           | Planned Purpose                                 |
-| --------------------------------- | ----------------------------------------------- |
-| Amazon CloudWatch                 | Infrastructure monitoring and alerting          |
-| Amazon GuardDuty                  | Threat detection                                |
-| AWS Security Hub                  | Centralized security findings                   |
-| AWS CloudTrail                    | API activity auditing                           |
-| AWS Systems Manager Patch Manager | Automated patch management                      |
-| AWS Secrets Manager               | Centralized secret management where appropriate |
+| Service | Planned Purpose |
+|---|---|
+| Amazon CloudWatch | Infrastructure monitoring and alerting |
+| Amazon GuardDuty | Threat detection |
+| AWS Security Hub | Centralized security findings |
+| AWS CloudTrail | API activity auditing |
+| AWS Systems Manager Patch Manager | Automated patch management |
+| AWS Secrets Manager | Centralized secret management where appropriate |
 
 These integrations are planned enhancements and are not represented as currently deployed.
 
@@ -329,9 +632,12 @@ These integrations are planned enhancements and are not represented as currently
 
 This project is intended for educational purposes and personal infrastructure experimentation.
 
+It should not be considered production-ready without additional security review, operational testing, access-control review, monitoring, backup planning, and cost analysis.
+
 Review AWS security settings, IAM permissions, network rules, VPN configurations, and billing implications before deploying in a production environment.
+
+---
 
 ## License
 
 This project is licensed under the MIT License.
-
