@@ -1,6 +1,9 @@
 # Local WireGuard client configuration
 ansible/vars/client1.yml
 
+# Locally generated Ansible WireGuard client registry
+ansible/vars/clients.yml
+
 # Terraform generated files
 **/.terraform/*
 **/*.tfstate
@@ -70,3 +73,16 @@ terraform/terraform.auto.tfvars.json
 
 # Generated Ansible deployment variables
 ansible/vars/deployment.yml
+
+# Locally generated WireGuard client credentials
+clients/
+
+# Temporary CloudVPN server-key provisioning authorization
+/terraform/.cloudvpn-server-key-generation-authorized
+
+# CloudVPN controller and authorization lock files
+/terraform/.cloudvpn-controller.lock
+/terraform/.cloudvpn-server-key-generation-authorized.lock
+
+# Client registry concurrency lock
+/ansible/vars/clients.yml.lock

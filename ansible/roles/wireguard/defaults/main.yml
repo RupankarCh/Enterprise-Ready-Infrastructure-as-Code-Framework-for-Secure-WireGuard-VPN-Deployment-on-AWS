@@ -11,6 +11,10 @@ wireguard_client_name: client1
 
 wireguard_client_address: "10.8.0.2/32"
 
+# Multi-client configuration.
+# An empty list preserves legacy single-client configuration.
+wireguard_clients: []
+
 wireguard_dns: "1.1.1.1"
 
 wireguard_client_dns: "1.1.1.1"

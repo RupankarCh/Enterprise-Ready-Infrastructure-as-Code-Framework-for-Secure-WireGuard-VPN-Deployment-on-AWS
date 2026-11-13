@@ -1,0 +1,101 @@
+---
+- name: Validate multi-client configuration structure
+  ansible.builtin.assert:
+    that:
+      - wireguard_clients | type_debug == 'list'
+    fail_msg: "wireguard_clients must be a YAML list."
+    quiet: true
+
+- name: Validate required client fields
+  ansible.builtin.assert:
+    that:
+      - client is mapping
+      - client.name is defined
+      - client.address is defined
+      - client.public_key is defined
+      - client.name is string
+      - client.address is string
+      - client.public_key is string
+      - client.name | length > 0
+      - client.address | length > 0
+      - client.public_key | length > 0
+    fail_msg: "Every WireGuard client must have name, address and public_key fields."
+    quiet: true
+  loop: "{{ wireguard_clients }}"
+  loop_control:
+    loop_var: client
+    label: "{{ client.name | default('unnamed-client') }}"
+  when: wireguard_clients | length > 0
+
+- name: Validate unique client names and addresses
+  ansible.builtin.assert:
+    that:
+      - (wireguard_clients | map(attribute='name') | list | unique | length) == (wireguard_clients | length)
+      - (wireguard_clients | map(attribute='address') | list | unique | length) == (wireguard_clients | length)
+    fail_msg: "WireGuard client names and addresses must be unique."
+    quiet: true
+  when: wireguard_clients | length > 0
+
+- name: Validate WireGuard client names
+  ansible.builtin.assert:
+    that:
+      - client.name is match('^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$')
+    fail_msg: "Client names must contain 1-32 letters, numbers, underscores or hyphens, and start with a letter or number."
+    quiet: true
+  loop: "{{ wireguard_clients }}"
+  loop_control:
+    loop_var: client
+    label: "{{ client.name }}"
+  when: wireguard_clients | length > 0
+
+- name: Validate client IP addresses and public keys
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - |
+        import base64
+        import binascii
+        import ipaddress
+        import json
+        import sys
+
+        data = json.loads(sys.argv[1])
+        network = ipaddress.ip_network(data["network"], strict=True)
+        server = ipaddress.ip_interface(data["server_address"])
+
+        if server.version != network.version or server.ip not in network:
+            raise SystemExit("Server address must belong to the VPN subnet.")
+
+        seen = set()
+
+        for client in data["clients"]:
+            interface = ipaddress.ip_interface(client["address"])
+
+            if interface.version != network.version:
+                raise SystemExit("Client address IP version differs from VPN subnet.")
+
+            if interface.network.prefixlen != network.max_prefixlen:
+                raise SystemExit("Each client address must use a host prefix.")
+
+            if interface.ip not in network:
+                raise SystemExit("A client address is outside the VPN subnet.")
+
+            if interface.ip == server.ip:
+                raise SystemExit("A client cannot use the server VPN address.")
+
+            if interface.ip in seen:
+                raise SystemExit("Duplicate client IP address detected.")
+
+            seen.add(interface.ip)
+
+            try:
+                public_key = base64.b64decode(client["public_key"], validate=True)
+            except (binascii.Error, ValueError):
+                raise SystemExit("Invalid WireGuard public key encoding.")
+
+            if len(public_key) != 32:
+                raise SystemExit("WireGuard public keys must decode to exactly 32 bytes.")
+      - "{{ {'network': wireguard_network, 'server_address': wireguard_server_address, 'clients': wireguard_clients} | to_json }}"
+  changed_when: false
+  when: wireguard_clients | length > 0

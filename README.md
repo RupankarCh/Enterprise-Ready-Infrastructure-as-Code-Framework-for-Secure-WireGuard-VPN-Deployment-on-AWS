@@ -152,7 +152,10 @@ CloudVPN-IaC/
 │
 ├── scripts/
 │   ├── configure.sh
-│   └── generate-inventory.sh
+│   ├── generate-inventory.sh
+│   ├── manage-clients.py
+│   ├── server-key-authorization.py
+│   └── terraform-plan-needs-server-key.py
 │
 ├── terraform/
 │   ├── modules/
@@ -163,10 +166,14 @@ CloudVPN-IaC/
 │   └── .terraform.lock.hcl
 │
 ├── tests/
+│   ├── client_management/
+│   ├── controller/
 │   └── firewall/
 │
+├── cloudvpn
 ├── .gitignore
 ├── .gitattributes
+├── LICENSE
 └── README.md
 ```
 
@@ -239,39 +246,86 @@ Some outbound permissions are required for full-tunnel VPN functionality. These 
 
 ---
 
+### 7. Deployment Controller Protection
+
+The `cloudvpn` controller coordinates infrastructure deployment and destruction.
+
+Security controls include:
+
+- Exclusive controller locking using `flock`.
+- Protection against unsafe lock-file types and symlinks.
+- One-time server-key generation authorization.
+- Authorization bound to the newly created EC2 instance ID.
+- Atomic authorization marker updates.
+- Restricted authorization file permissions.
+- Authorization consumption after successful Ansible configuration.
+- Authorization preservation when deployment fails, allowing controlled retries.
+
+The authorization helper is:
+
+`scripts/server-key-authorization.py`
+
+Terraform plan analysis helps distinguish new or replaced EC2 instances from existing infrastructure.
+
+### 8. Client Management Security
+
+Client registration and revocation are handled by:
+
+`scripts/manage-clients.py`
+
+Security controls include:
+
+- Client-name validation.
+- WireGuard public-key validation.
+- Duplicate client-name and VPN-address protection.
+- Client registry validation.
+- Client revocation.
+- Protection against unsafe registry file handling.
+
+The management utility updates the local client registry. Registration or revocation through this utility does not itself modify the running VPN server.
+
 ## Prerequisites
 
-Install the following tools on the deployment workstation:
+The following tools are required on the deployment workstation.
 
-- Terraform.
-- Python 3.
-- Ansible.
-- AWS CLI.
-- Git.
-- WireGuard client application.
+| Tool | Requirement | Purpose |
+|---|---|---|
+| Git | Installed | Clone and manage the repository |
+| Terraform | >= 1.6.0; CI-tested with 1.17.1 | Infrastructure provisioning |
+| Python | Python 3 | Configuration generator and tests |
+| pip | Compatible with installed Python | Python dependencies |
+| Ansible Core | 2.21.3 | Server configuration |
+| AWS CLI | Version 2 recommended | AWS authentication and API access |
+| Session Manager plugin | Installed and configured | SSM-based Ansible connections |
+| WireGuard client | Compatible client application | VPN connectivity |
 
-Ansible dependencies are defined in:
+The AWS provider is constrained to `~> 6.0`. The committed Terraform dependency lock file records version `6.64.0`.
 
-```text
-ansible/requirements.txt
-ansible/requirements.yml
-```
+### Python Environment
 
-Install the Python requirements:
+It is recommended to use a Python virtual environment.
+
+From the repository root:
 
 ```bash
-pip install -r ansible/requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 ```
 
-Install the Ansible collections:
+### Install Ansible Dependencies
+
+Install the pinned Python dependencies:
+
+```bash
+python -m pip install -r ansible/requirements.lock.txt
+```
+
+### Install the required Ansible collections:
 
 ```bash
 ansible-galaxy collection install -r ansible/requirements.yml
 ```
-
-Configure AWS CLI credentials on the deployment workstation with permissions appropriate for Terraform provisioning and SSM inventory generation.
-
-The EC2 instance uses its IAM role for AWS access; long-lived AWS credentials should not be copied onto the VPN server.
 
 ---
 
@@ -505,6 +559,20 @@ ansible-playbook \
   -e wireguard_client_vars_file=ansible/vars/client1.example.yml
 ```
 
+### Controller and Authorization Tests
+
+```bash
+python3 -m unittest discover -s tests/controller -v
+```
+
+### Client Management Tests
+
+```bash
+python3 -m unittest discover \
+  -s tests/client_management \
+  -v
+```
+
 ### Firewall Tests
 
 ```bash
@@ -534,12 +602,13 @@ GitHub Actions is configured through:
 .github/workflows/ci.yml
 ```
 
-The workflow contains five jobs:
+The workflow contains six jobs:
 
 | Job | Purpose |
 |---|---|
 | terraform | Terraform formatting and validation |
 | ansible | Ansible dependency installation and syntax validation |
+| python-tests | Controller, authorization, client-management, and Python compilation tests |
 | firewall-tests | Firewall shell and Python unit tests |
 | gitleaks | Secret scanning |
 | trivy | Terraform security scanning |

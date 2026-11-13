@@ -6,7 +6,54 @@
 
   vars_files:
     - "{{ playbook_dir }}/../vars/deployment.yml"
-    - "{{ wireguard_client_vars_file | default(playbook_dir ~ '/../vars/client1.yml') }}"
+
+  pre_tasks:
+    - name: Check whether multi-client registry exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../vars/clients.yml"
+      delegate_to: localhost
+      become: false
+      register: wireguard_clients_registry
+      run_once: true
+
+    - name: Load multi-client registry into an isolated variable
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../vars/clients.yml"
+        name: wireguard_client_registry_data
+      when: wireguard_clients_registry.stat.exists
+
+    - name: Validate multi-client registry structure
+      ansible.builtin.assert:
+        that:
+          - wireguard_client_registry_data is mapping
+          - wireguard_client_registry_data.wireguard_clients is defined
+          - wireguard_client_registry_data.wireguard_clients | type_debug == 'list'
+        fail_msg: >-
+          Invalid clients.yml registry. It must contain a
+          wireguard_clients YAML list.
+        quiet: true
+      when: wireguard_clients_registry.stat.exists
+
+    - name: Load registered clients into WireGuard configuration
+      ansible.builtin.set_fact:
+        wireguard_clients: "{{ wireguard_client_registry_data.wireguard_clients }}"
+      when: wireguard_clients_registry.stat.exists
+
+    - name: Check whether legacy single-client configuration exists
+      ansible.builtin.stat:
+        path: "{{ wireguard_client_vars_file | default(playbook_dir ~ '/../vars/client1.yml') }}"
+      delegate_to: localhost
+      become: false
+      register: wireguard_legacy_client_config
+      run_once: true
+      when: not wireguard_clients_registry.stat.exists
+
+    - name: Load legacy single-client configuration
+      ansible.builtin.include_vars:
+        file: "{{ wireguard_client_vars_file | default(playbook_dir ~ '/../vars/client1.yml') }}"
+      when:
+        - not wireguard_clients_registry.stat.exists
+        - wireguard_legacy_client_config.stat.exists | default(false)
 
   roles:
     - wireguard

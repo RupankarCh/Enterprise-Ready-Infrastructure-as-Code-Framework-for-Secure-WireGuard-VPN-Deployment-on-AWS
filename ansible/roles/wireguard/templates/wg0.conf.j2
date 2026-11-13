@@ -8,7 +8,17 @@ PrivateKey = {{ wireguard_server_private_key_content.content | b64decode | trim 
 PostUp = iptables -t nat -A POSTROUTING -s {{ wireguard_network }} -o {{ wireguard_external_interface }} -j MASQUERADE
 PostDown = iptables -t nat -D POSTROUTING -s {{ wireguard_network }} -o {{ wireguard_external_interface }} -j MASQUERADE
 
+{% if wireguard_clients | default([]) | length > 0 %}
+{% for client in wireguard_clients %}
 [Peer]
-# Windows client
+# {{ client.name }}
+PublicKey = {{ client.public_key }}
+AllowedIPs = {{ client.address }}
+
+{% endfor %}
+{% elif wireguard_client_public_key is defined and wireguard_client_address is defined %}
+[Peer]
+# Legacy single-client configuration
 PublicKey = {{ wireguard_client_public_key }}
 AllowedIPs = {{ wireguard_client_address }}
+{% endif %}

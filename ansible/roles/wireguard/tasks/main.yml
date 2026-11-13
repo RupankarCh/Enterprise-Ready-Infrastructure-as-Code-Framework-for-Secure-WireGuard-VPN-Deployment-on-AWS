@@ -1,4 +1,8 @@
 ---
+
+- name: Validate WireGuard client configuration
+  ansible.builtin.import_tasks: validate_clients.yml
+
 - name: Validate discovered external network interface
   ansible.builtin.assert:
     that:
